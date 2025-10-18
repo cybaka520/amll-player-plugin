@@ -98,19 +98,6 @@ jobs:
           TS=$(date +%s%3N)
           echo "name=plugin/${{ steps.meta.outputs.NAME }}-${{ github.event.issue.number }}-$TS" >> $GITHUB_OUTPUT
 
-      - name: 创建并推送分支
-        if: steps.dl.outputs.success == 'true'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          BRANCH="${{ steps.branch.outputs.name }}"
-          git branch -D "$BRANCH" || true
-          git push origin --delete "$BRANCH" || true
-          git checkout -b "$BRANCH"
-          git add raw-plugin/${{ steps.dl.outputs.FILENAME }} metadata/raw-plugin-index.jsonl
-          git commit -m "Add plugin ${{ steps.meta.outputs.NAME }} from #${{ github.event.issue.number }}"
-          git push origin "$BRANCH"
-
       - name: 创建 PR
         if: steps.dl.outputs.success == 'true'
         id: cpr
@@ -126,6 +113,7 @@ jobs:
 
             来源 Issue：#${{ github.event.issue.number }}
           base: main
+          commit-message: "Add plugin ${{ steps.meta.outputs.NAME }} from #${{ github.event.issue.number }}"
 
       - name: 成功创建 PR 后关闭 Issue
         if: steps.dl.outputs.success == 'true'
