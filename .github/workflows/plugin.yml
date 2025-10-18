@@ -48,6 +48,10 @@ jobs:
           mkdir -p amll-plugin
           test -f "$SRC" || { echo "源文件 $SRC 不存在"; exit 1; }
           cp "$SRC" "$DST"
+          # 复制图标
+          ICON_SRC="raw-plugin/${{ steps.meta.outputs.NAME }}.svg"
+          ICON_DST="amll-plugin/${{ steps.meta.outputs.NAME }}-${{ steps.meta.outputs.AUTHOR }}.svg"
+          test -f "$ICON_SRC" && cp "$ICON_SRC" "$ICON_DST"
           
       - name: 生成索引
         run: |
@@ -55,11 +59,12 @@ jobs:
           PLUGIN="${{ steps.meta.outputs.NAME }}"
           AUTHOR="${{ steps.meta.outputs.AUTHOR }}"
           NEW=$(jq -n \
-                  --arg fn  "${{ steps.meta.outputs.NAME }}-${{ steps.meta.outputs.AUTHOR }}.js" \
-                  --arg name "$PLUGIN" \
-                  --arg desc "${{ steps.meta.outputs.DESC }}" \
-                  --arg author "$AUTHOR" \
-                  '{filename:$fn, plugin:$name, description:$desc, author:$author}')
+          --arg fn  "${{ steps.meta.outputs.NAME }}-${{ steps.meta.outputs.AUTHOR }}.js" \
+          --arg icon "${{ steps.meta.outputs.NAME }}-${{ steps.meta.outputs.AUTHOR }}.svg" \
+          --arg name "${{ steps.meta.outputs.NAME }}" \
+          --arg desc "${{ steps.meta.outputs.DESC }}" \
+          --arg author "${{ steps.meta.outputs.AUTHOR }}" \
+          '{filename:$fn, icon:$icon, plugin:$name, description:$desc, author:$author}')
 
           # 删除旧记录
           jq -c --arg p "$PLUGIN" --arg a "$AUTHOR" \
