@@ -14,7 +14,7 @@ body:
       required: true 
       
   - type: textarea
-     id: icon
+     id: image
      attributes:
       label: SVG 图标
       placeholder: 
