@@ -59,7 +59,7 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `@${{ github.event.issue.user.login }} 插件下载失败，请检查直链是否有效（404 或无权限）。可编辑 Issue 修正链接后重新打开。`
+              body: `@${{ github.event.issue.user.login }} 插件下载失败，请检查直链是否有效。`
             });
             await github.rest.issues.update({
               issue_number: context.issue.number,
