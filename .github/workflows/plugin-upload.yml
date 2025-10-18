@@ -31,27 +31,22 @@ jobs:
           DESC=$(echo "$body" | awk '/^### 插件简介/{getline; while ($0=="") getline; print; exit}' | xargs)
           AUTHOR=$(echo "$body" | awk '/^### 插件作者/{getline; while ($0=="") getline; print; exit}' | xargs)
           URL=$(echo "$body"  | awk '/^### 插件下载直链/{getline; while ($0=="") getline; print; exit}' | xargs)
-
           echo "NAME=$NAME" >> $GITHUB_OUTPUT
           echo "DESC=$DESC" >> $GITHUB_OUTPUT
           echo "AUTHOR=$AUTHOR" >> $GITHUB_OUTPUT
           echo "URL=$URL" >> $GITHUB_OUTPUT
-
           echo "==== Parsed ====="
           echo "NAME=[$NAME]"
           echo "DESC=[$DESC]"
           echo "AUTHOR=[$AUTHOR]"
           echo "URL=[$URL]"
 
-
       - name: 下载插件
         id: dl
         continue-on-error: true
         run: |
-          set -x
+          set -e
           URL="${{ steps.meta.outputs.URL }}"
-          echo "Raw URL=[$URL]"
-
           mkdir -p raw-plugin
           curl -L -o raw-plugin/plugin.js -w "%{http_code}" --fail-with-body "$URL"
           status=$?
@@ -59,15 +54,12 @@ jobs:
             echo "success=false" >> $GITHUB_OUTPUT
             exit 0
           fi
-
           TS=$(date +%s)
           RAND=$(openssl rand -hex 4)
           FILENAME="${TS}-${{ github.event.issue.user.login }}-${RAND}.js"
           mv raw-plugin/plugin.js raw-plugin/"$FILENAME"
-
-          echo "success=true"  >> $GITHUB_OUTPUT
+          echo "success=true" >> $GITHUB_OUTPUT
           echo "FILENAME=$FILENAME" >> $GITHUB_OUTPUT
-
 
       - name: 下载失败处理
         if: steps.dl.outputs.success != 'true'
@@ -105,14 +97,10 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          BRANCH="plugin/${{ steps.meta.outputs.NAME }}-${{ github.run_id }}"
-
-          # 清理本地/远程可能残留的同名分支
+          TS=$(date +%s%3N)
+          BRANCH="plugin/${{ steps.meta.outputs.NAME }}-${{ github.event.issue.number }}-$TS"
           git branch -D "$BRANCH" || true
           git push origin --delete "$BRANCH" || true
-
-          # 新建并推送
           git checkout -b "$BRANCH"
           git add raw-plugin/${{ steps.dl.outputs.FILENAME }} metadata/raw-plugin-index.jsonl
           git commit -m "Add plugin ${{ steps.meta.outputs.NAME }} from #${{ github.event.issue.number }}"
@@ -120,17 +108,16 @@ jobs:
 
       - name: 创建 PR
         if: steps.dl.outputs.success == 'true'
-        id: cpre
+        id: cpr
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          branch: "plugin/${{ steps.meta.outputs.NAME }}-${{ github.run_id }}"
+          branch: "plugin/${{ steps.meta.outputs.NAME }}-${{ github.event.issue.number }}-$(date +%s%3N)"
           title: "${{ steps.meta.outputs.NAME }}"
           body: |
             **插件名：** ${{ steps.meta.outputs.NAME }}  
             **作者：** @${{ steps.meta.outputs.AUTHOR }}  
             **简介：** ${{ steps.meta.outputs.DESC }}  
-
             来源 Issue：#${{ github.event.issue.number }}
           base: main
 
@@ -140,76 +127,16 @@ jobs:
         with:
           script: |
             const issue_number = ${{ github.event.issue.number }};
-            const repo         = '${{ github.repository }}'.split('/');
-            const owner        = repo[0];
-            const repo_name    = repo[1];
-            const pr_url       = '${{ steps.cpr.outputs.pull-request-url }}';
             const author       = '${{ github.event.issue.user.login }}';
-
+            const pr_url       = '${{ steps.cpr.outputs.pull-request-url }}';
             await github.rest.issues.createComment({
               issue_number,
-              owner,
-              repo: repo_name,
-              body: `@${author} 已创建 PR：${pr_url} ，请等待审核。`
-            });
-
-            await github.rest.issues.update({
-              issue_number,
-              owner,
-              repo: repo_name,
-              state: 'closed'
-            });
-
-      - name: 创建并推送分支
-        if: steps.dl.outputs.success == 'true'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          # 毫秒级时间戳
-          TS=$(date +%s%3N)
-          BRANCH="plugin/${{ steps.meta.outputs.NAME }}-${{ github.event.issue.number }}-$TS"
-
-          # 清理本地/远程可能残留的同名分支（防止旧脏数据）
-          git branch -D "$BRANCH" || true
-          git push origin --delete "$BRANCH" || true
-
-          # 新建并推送
-          git checkout -b "$BRANCH"
-          git add raw-plugin/${{ steps.dl.outputs.FILENAME }} metadata/raw-plugin-index.jsonl
-          git commit -m "Add plugin ${{ steps.meta.outputs.NAME }} from #${{ github.event.issue.number }}"
-          git push origin "$BRANCH"
-
-
-      - name: 创建 PR
-        if: steps.dl.outputs.success == 'true'
-        id: cpr
-        uses: peter-evans/create-pull-request@v6
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          branch: "plugin/${{ steps.meta.outputs.NAME }}-${{ github.run_id }}"
-          title: "${{ steps.meta.outputs.NAME }}"
-          body: |
-            **插件名：** ${{ steps.meta.outputs.NAME }}  
-            **作者：** @${{ steps.meta.outputs.AUTHOR }}  
-            **简介：** ${{ steps.meta.outputs.DESC }}  
-
-            来源 Issue：#${{ github.event.issue.number }}
-          base: main
-
-      - name: 成功创建 PR 后关闭 Issue
-        if: steps.dl.outputs.success == 'true'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            await github.rest.issues.createComment({
-              issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `已创建 PR：${{ steps.cpr.outputs.pull-request-url }} ，请等待审核。`
+              body: `@${author} 已创建 PR：${pr_url} ，请等待审核。`
             });
             await github.rest.issues.update({
-              issue_number: context.issue.number,
+              issue_number,
               owner: context.repo.owner,
               repo: context.repo.repo,
               state: 'closed'
