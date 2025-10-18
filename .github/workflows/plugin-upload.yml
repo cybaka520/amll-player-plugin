@@ -165,10 +165,21 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout -b "plugin/${{ steps.meta.outputs.NAME }}-${{ github.run_id }}"
-          git add raw-lyrics/${{ steps.dl.outputs.FILENAME }} metadata/raw-plugin-index.jsonl
+
+          # 毫秒级时间戳
+          TS=$(date +%s%3N)
+          BRANCH="plugin/${{ steps.meta.outputs.NAME }}-${{ github.event.issue.number }}-$TS"
+
+          # 清理本地/远程可能残留的同名分支（防止旧脏数据）
+          git branch -D "$BRANCH" || true
+          git push origin --delete "$BRANCH" || true
+
+          # 新建并推送
+          git checkout -b "$BRANCH"
+          git add raw-plugin/${{ steps.dl.outputs.FILENAME }} metadata/raw-plugin-index.jsonl
           git commit -m "Add plugin ${{ steps.meta.outputs.NAME }} from #${{ github.event.issue.number }}"
-          git push origin "plugin/${{ steps.meta.outputs.NAME }}-${{ github.run_id }}"
+          git push origin "$BRANCH"
+
 
       - name: 创建 PR
         if: steps.dl.outputs.success == 'true'
