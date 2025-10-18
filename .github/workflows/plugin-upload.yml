@@ -93,7 +93,7 @@ jobs:
 
       - name: 创建 PR
         if: steps.dl.outputs.success == 'true'
-        id: cpr
+        id: cpre
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
