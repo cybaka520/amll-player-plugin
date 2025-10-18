@@ -11,7 +11,17 @@ body:
       label: 插件名
       placeholder: 
     validations:
-      required: true
+      required: true 
+  - type: textarea
+     id: icon
+    attributes:
+      label: SVG 图标
+      description: 将 SVG 源码直接粘贴在下方
+      placeholder: 
+      render: xml
+    validations:
+      required: false
+
 
   - type: input
     id: desc
