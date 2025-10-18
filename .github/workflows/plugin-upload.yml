@@ -31,7 +31,7 @@ jobs:
           DESC=$(echo "$body" | awk '/^### 插件简介/{getline; while ($0=="") getline; print; exit}' | xargs)
           AUTHOR=$(echo "$body" | awk '/^### 插件作者/{getline; while ($0=="") getline; print; exit}' | xargs)
           URL=$(echo "$body"  | awk '/^### 插件下载直链/{getline; while ($0=="") getline; print; exit}' | xargs)
-          VERSION=$(echo "$body" | awk '/^### 版本号/{getline; while ($0=="") getline; print; exit}' | xargs)
+          VERSION=$(echo "$body" | awk '/^### 插件版本号/{getline; while ($0=="") getline; print; exit}' | xargs)
           echo "NAME=$NAME" >> $GITHUB_OUTPUT
           echo "DESC=$DESC" >> $GITHUB_OUTPUT
           echo "AUTHOR=$AUTHOR" >> $GITHUB_OUTPUT
