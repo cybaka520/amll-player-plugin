@@ -23,20 +23,16 @@ jobs:
         with:
           script: |
             const body = context.payload.pull_request.body;
-            const get = (label) => {
-              const m = body.match(new RegExp(`^\\\\*\\\\*${label}：\\\\*\\\\*\\\\s*(.+)\\\\s*$`, 'm'));
-              return m ? m[1].trim() : '';
-            };
-            core.setOutput('NAME',   get('插件名'));
-            core.setOutput('AUTHOR', get('作者'));
-            core.setOutput('VERSION',get('版本号'));
-            core.setOutput('DESC',   get('简介'));
-            const filename = context.payload.pull_request.title.replace(/^Add plugin /, '');
-            core.setOutput('FILENAME', filename);
+            const get = l => {const m=body.match(new RegExp(`^\\\\*\\\\*${l}：\\\\*\\\\*\\\\s*(.+)\\\\s*$`,'m')); return m?m[1].trim():'';};
+            const title = context.payload.pull_request.title;
+            core.setOutput('NAME',    title.replace(/^Add plugin (.+) from #\d+$/,'$1'));
+            core.setOutput('AUTHOR',  get('作者'));
+            core.setOutput('VERSION', get('版本号'));
+            core.setOutput('DESC',    get('简介'));
 
       - name: 复制插件到发布目录
         run: |
-          SRC="raw-plugin/${{ steps.meta.outputs.FILENAME }}"
+          SRC="raw-plugin/${{ steps.meta.outputs.NAME }}"
           DST="amll-plugin/${{ steps.meta.outputs.NAME }}-${{ steps.meta.outputs.AUTHOR }}.js"
           mkdir -p amll-plugin
           test -f "$SRC" || { echo "源文件 $SRC 不存在"; exit 1; }
