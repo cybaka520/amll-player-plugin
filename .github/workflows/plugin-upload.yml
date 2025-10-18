@@ -27,10 +27,10 @@ jobs:
         id: meta
         run: |
           body='${{ github.event.issue.body }}'
-          NAME=$(echo "$body" | sed -n 's/^插件名:[[:space:]]*//p' | xargs)
-          DESC=$(echo "$body" | sed -n 's/^插件简介:[[:space:]]*//p' | xargs)
-          AUTHOR=$(echo "$body" | sed -n 's/^插件作者:[[:space:]]*//p' | xargs)
-          URL=$(echo "$body"  | sed -n 's/^插件下载直链:[[:space:]]*//p' | xargs)
+          NAME=$(echo "$body" | awk '/^### 插件名/{getline; while ($0=="") getline; print; exit}' | xargs)
+          DESC=$(echo "$body" | awk '/^### 插件简介/{getline; while ($0=="") getline; print; exit}' | xargs)
+          AUTHOR=$(echo "$body" | awk '/^### 插件作者/{getline; while ($0=="") getline; print; exit}' | xargs)
+          URL=$(echo "$body"  | awk '/^### 插件下载直链/{getline; while ($0=="") getline; print; exit}' | xargs)
 
           echo "NAME=$NAME" >> $GITHUB_OUTPUT
           echo "DESC=$DESC" >> $GITHUB_OUTPUT
