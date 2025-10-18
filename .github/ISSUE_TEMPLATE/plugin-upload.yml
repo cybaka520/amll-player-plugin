@@ -2,7 +2,7 @@ name: "插件上传/更新"
 description: "提交新插件"
 title: "[插件上传/更新] "
 labels: ["插件上传/更新"]
-Assignees: 
+assignees: 
   - cybaka520
 body:
   - type: input
