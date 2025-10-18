@@ -27,10 +27,10 @@ jobs:
         id: meta
         run: |
           body='${{ github.event.issue.body }}'
-          echo "$body" | grep -E '^### 插件名'  -A1 | tail -1 | sed 's/^/NAME=/' >> $GITHUB_OUTPUT
-          echo "$body" | grep -E '^### 插件简介' -A1 | tail -1 | sed 's/^/DESC=/' >> $GITHUB_OUTPUT
-          echo "$body" | grep -E '^### 插件作者' -A1 | tail -1 | sed 's/^/AUTHOR=/' >> $GITHUB_OUTPUT
-          echo "$body" | grep -E '^### 插件下载直链' -A1 | tail -1 | sed 's/^/URL=/' >> $GITHUB_OUTPUT
+          echo "$body" | grep -E '^### 插件名'  -A1 | tail -1 | xargs | sed 's/^/NAME=/' >> $GITHUB_OUTPUT
+          echo "$body" | grep -E '^### 插件简介' -A1 | tail -1 | xargs | sed 's/^/DESC=/' >> $GITHUB_OUTPUT
+          echo "$body" | grep -E '^### 插件作者' -A1 | tail -1 | xargs | sed 's/^/AUTHOR=/' >> $GITHUB_OUTPUT
+          echo "$body" | grep -E '^### 插件下载直链' -A1 | tail -1 | xargs | sed 's/^/URL=/' >> $GITHUB_OUTPUT
 
       - name: 下载插件
         id: dl
