@@ -29,14 +29,16 @@ jobs:
             core.setOutput('AUTHOR',  get('作者'));
             core.setOutput('VERSION', get('版本号'));
             core.setOutput('DESC',    get('简介'));
+            core.setOutput('FILENAME', get('文件名'));
 
       - name: 复制插件到发布目录
         run: |
-          SRC="raw-plugin/${{ steps.meta.outputs.NAME }}"
+          SRC="raw-plugin/${{ steps.meta.outputs.FILENAME }}"
           DST="amll-plugin/${{ steps.meta.outputs.NAME }}-${{ steps.meta.outputs.AUTHOR }}.js"
           mkdir -p amll-plugin
           test -f "$SRC" || { echo "源文件 $SRC 不存在"; exit 1; }
           cp "$SRC" "$DST"
+
 
       - name: 生成索引
         run: |
