@@ -17,7 +17,6 @@ body:
      id: icon
      attributes:
       label: SVG 图标
-      description: 将 SVG 源码直接粘贴在下方
       placeholder: 
       render: xml
     validations:
