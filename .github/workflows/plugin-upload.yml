@@ -114,10 +114,11 @@ jobs:
           title: "${{ steps.meta.outputs.NAME }}"
           body: |
             **插件名：** ${{ steps.meta.outputs.NAME }}  
-            **版本号：** ${{ steps.meta.outputs.VERSION }}  
             **作者：** @${{ steps.meta.outputs.AUTHOR }}  
+            **版本号：** ${{ steps.meta.outputs.VERSION }}  
             **简介：** ${{ steps.meta.outputs.DESC }}  
-            来源 Issue：#${{ github.event.issue.number }}
+            **文件名：** ${{ steps.dl.outputs.FILENAME }}
+            **来源 Issue：** #${{ github.event.issue.number }}
           base: main
           commit-message: "Add plugin ${{ steps.meta.outputs.NAME }} from #${{ github.event.issue.number }}"
 
