@@ -45,9 +45,11 @@ jobs:
         id: dl
         continue-on-error: true
         run: |
+          set -x          
+          URL="${{ steps.meta.outputs.URL }}"
+          echo "Raw URL=[$URL]"  
           mkdir -p tmp
-          status=$(curl -L -o tmp/plugin.js -w "%{http_code}" --fail-with-body "${{ steps.meta.outputs.URL }}")
-          echo "HTTP status : $status"
+          status=$(curl -L -o tmp/plugin.js -w "%{http_code}" --fail-with-body "$URL")
           if [ $? -ne 0 ] || [ ! -s tmp/plugin.js ]; then
             echo "success=false" >> $GITHUB_OUTPUT
             exit 0
@@ -58,6 +60,7 @@ jobs:
           mv tmp/plugin.js "raw-lyrics/$FILENAME"
           echo "success=true"  >> $GITHUB_OUTPUT
           echo "FILENAME=$FILENAME" >> $GITHUB_OUTPUT
+
 
       - name: 下载失败处理
         if: steps.dl.outputs.success != 'true'
