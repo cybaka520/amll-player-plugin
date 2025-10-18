@@ -26,11 +26,20 @@ jobs:
       - name: 解析issue
         id: meta
         run: |
-          body='${{ github.event.issue.body }}'
-          echo "$body" | grep -E '^### 插件名'  -A1 | tail -1 | xargs | sed 's/^/NAME=/' >> $GITHUB_OUTPUT
-          echo "$body" | grep -E '^### 插件简介' -A1 | tail -1 | xargs | sed 's/^/DESC=/' >> $GITHUB_OUTPUT
-          echo "$body" | grep -E '^### 插件作者' -A1 | tail -1 | xargs | sed 's/^/AUTHOR=/' >> $GITHUB_OUTPUT
-          echo "$body" | grep -E '^### 插件下载直链' -A1 | tail -1 | xargs | sed 's/^/URL=/' >> $GITHUB_OUTPUT
+          body="$(cat <<'EOF'
+          ${{ github.event.issue.body }}
+          EOF
+          )"
+          NAME=$(echo "$body" | sed -n '/^### 插件名/,/^$/p' | sed '1d;/^$/d' | xargs)
+          DESC=$(echo "$body" | sed -n '/^### 插件简介/,/^$/p' | sed '1d;/^$/d' | xargs)
+          AUTHOR=$(echo "$body" | sed -n '/^### 插件作者/,/^$/p' | sed '1d;/^$/d' | xargs)
+          URL=$(echo "$body"  | sed -n '/^### 插件下载直链/,/^$/p' | sed '1d;/^$/d' | xargs)
+          
+          echo "NAME=$NAME" >> $GITHUB_OUTPUT
+          echo "DESC=$DESC" >> $GITHUB_OUTPUT
+          echo "AUTHOR=$AUTHOR" >> $GITHUB_OUTPUT
+          echo "URL=$URL" >> $GITHUB_OUTPUT
+
 
       - name: 下载插件
         id: dl
