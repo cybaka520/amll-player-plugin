@@ -32,19 +32,24 @@ jobs:
           AUTHOR=$(echo "$body" | awk '/^### 插件作者/{getline; while ($0=="") getline; print; exit}' | xargs)
           URL=$(echo "$body"  | awk '/^### 插件下载直链/{getline; while ($0=="") getline; print; exit}' | xargs)
           VERSION=$(echo "$body" | awk '/^### 插件版本号/{getline; while ($0=="") getline; print; exit}' | xargs)
-          SVG=$(echo "$body" | awk '/^### SVG 图标/{getline; while ($0=="") getline; print; exit}' | xargs)
+
+          SVG=$(sed -n '/^### SVG 图标/,/^### \|^$/p' <<<"$body" | sed '1d;/^$/d;$d' | sed 's/^ *//')
+
           echo "SVG=$SVG" >> $GITHUB_OUTPUT
           echo "NAME=$NAME" >> $GITHUB_OUTPUT
           echo "DESC=$DESC" >> $GITHUB_OUTPUT
           echo "AUTHOR=$AUTHOR" >> $GITHUB_OUTPUT
           echo "URL=$URL" >> $GITHUB_OUTPUT
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+          # 调试用
           echo "==== Parsed ====="
           echo "NAME=[$NAME]"
           echo "DESC=[$DESC]"
           echo "AUTHOR=[$AUTHOR]"
           echo "URL=[$URL]"
           echo "VERSION=[$VERSION]"
+          echo "SVG 行数: $(echo "$SVG" | wc -l)"
 
 
       - name: 下载插件
@@ -67,6 +72,7 @@ jobs:
           echo "success=true" >> $GITHUB_OUTPUT
           echo "FILENAME=$FILENAME" >> $GITHUB_OUTPUT
 
+
       - name: 下载失败处理
         if: steps.dl.outputs.success != 'true'
         uses: actions/github-script@v7
@@ -86,7 +92,8 @@ jobs:
             });
             core.setFailed('插件下载失败');
 
-      - name: 添加元数据
+
+      - name: 添加元数据 & 写入 SVG
         if: steps.dl.outputs.success == 'true'
         run: |
           ENTRY=$(jq -n \
@@ -98,9 +105,11 @@ jobs:
             --arg issue "${{ github.event.issue.number }}" \
             '{filename:$fn, name:$name, author:$author, description:$desc, version:$version}')
           echo "$ENTRY" >> metadata/raw-plugin-index.jsonl
-          ICON_FILE="raw-plugin/${NAME}.svg"
-            echo "$SVG" > "$ICON_FILE"
-            git add "$ICON_FILE"
+
+          # 写出 SVG（保留换行）
+          ICON_FILE="raw-plugin/${{ steps.meta.outputs.NAME }}.svg"
+          echo "${{ steps.meta.outputs.SVG }}" > "$ICON_FILE"
+          git add "$ICON_FILE"
 
 
       - name: 生成唯一分支名
@@ -108,6 +117,7 @@ jobs:
         run: |
           TS=$(date +%s%3N)
           echo "name=plugin/${{ steps.meta.outputs.NAME }}-${{ github.event.issue.number }}-$TS" >> $GITHUB_OUTPUT
+
 
       - name: 创建 PR
         if: steps.dl.outputs.success == 'true'
@@ -119,13 +129,14 @@ jobs:
           title: "${{ steps.meta.outputs.NAME }}"
           body: |
             **插件名：** ${{ steps.meta.outputs.NAME }}  
-            **作者：** @${{ steps.meta.outputs.AUTHOR }}  
+            **作者：** @${{ github.event.issue.user.login }}  
             **版本号：** ${{ steps.meta.outputs.VERSION }}  
             **简介：** ${{ steps.meta.outputs.DESC }}  
             **文件名：** ${{ steps.dl.outputs.FILENAME }}
             **来源 Issue：** #${{ github.event.issue.number }}
           base: main
           commit-message: "Add plugin ${{ steps.meta.outputs.NAME }} from #${{ github.event.issue.number }}"
+
 
       - name: 成功创建 PR 后关闭 Issue
         if: steps.dl.outputs.success == 'true'
