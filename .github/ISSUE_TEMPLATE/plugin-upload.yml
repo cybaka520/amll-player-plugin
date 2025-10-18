@@ -1,8 +1,9 @@
 name: "插件上传/更新"
 description: "提交新插件"
-Assignees: "cybaka520"
 title: "[插件上传/更新] "
 labels: ["插件上传/更新"]
+Assignees: 
+  - cybaka520
 body:
   - type: input
     id: name
