@@ -22,7 +22,7 @@ body:
       required: true
       
   - type: input
-    id: author
+    id: version
     attributes:
       label: 插件版本号
       placeholder: 0.0.1
