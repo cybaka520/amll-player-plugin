@@ -52,14 +52,20 @@ jobs:
       - name: 生成索引
         run: |
           INDEX="amll-plugin/index.jsonl"
-          jq -n \
-            --arg fn  "${{ steps.meta.outputs.NAME }}-${{ steps.meta.outputs.AUTHOR }}.js" \
-            --arg name "${{ steps.meta.outputs.NAME }}" \
-            --arg desc "${{ steps.meta.outputs.DESC }}" \
-            --arg author "${{ steps.meta.outputs.AUTHOR }}" \
-            --arg ver  "${{ steps.meta.outputs.VERSION }}" \
-            '{filename:$fn, plugin:$name, description:$desc, author:$author, version:$ver, publishedAt: now | todate}' \
-          >> "$INDEX"
+          PLUGIN="${{ steps.meta.outputs.NAME }}"
+          AUTHOR="${{ steps.meta.outputs.AUTHOR }}"
+          if grep -q "\"plugin\":\"$PLUGIN\",\"author\":\"$AUTHOR\"" "$INDEX"; then
+            echo "已存在，仅更新文件"
+          else
+            jq -n \
+              --arg fn  "${{ steps.meta.outputs.NAME }}-${{ steps.meta.outputs.AUTHOR }}.js" \
+              --arg name "$PLUGIN" \
+              --arg desc "${{ steps.meta.outputs.DESC }}" \
+              --arg author "$AUTHOR" \
+              '{filename:$fn, plugin:$name, description:$desc, author:$author}' \
+            >> "$INDEX"
+          fi
+
 
       - name: 提交并推送
         run: |
