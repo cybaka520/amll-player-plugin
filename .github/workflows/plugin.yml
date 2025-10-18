@@ -23,13 +23,13 @@ jobs:
         with:
           script: |
             const body = context.payload.pull_request.body;
-            const get = l => {const m=body.match(new RegExp(`^\\\\*\\\\*${l}：\\\\*\\\\*\\\\s*(\\S+).*`,'m')); return m?m[1].trim():'';};
+            const get = l => { const m = body.match(new RegExp(`\\*\\*${l}：\\*\\*\\s*(.+?)\\s*(?:\\*\\*|$)`, 's'));  return m ? m[1].trim() : '';};
             const title = context.payload.pull_request.title;
             core.setOutput('NAME',    title.replace(/^Add plugin (.+) from #\d+$/,'$1'));
-            core.setOutput('AUTHOR',  get('** 作者：**'));
-            core.setOutput('VERSION', get('**版本号：**'));
-            core.setOutput('DESC',    get('**简介：**'));
-            core.setOutput('FILENAME',get('**文件名：**'));
+            core.setOutput('AUTHOR',  get('作者'));
+            core.setOutput('VERSION', get('版本号'));
+            core.setOutput('DESC',    get('简介'));
+            core.setOutput('FILENAME',get('文件名'));
 
       - name: 复制插件前调试
         run: |
