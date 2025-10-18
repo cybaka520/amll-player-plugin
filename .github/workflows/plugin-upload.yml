@@ -32,6 +32,8 @@ jobs:
           AUTHOR=$(echo "$body" | awk '/^### 插件作者/{getline; while ($0=="") getline; print; exit}' | xargs)
           URL=$(echo "$body"  | awk '/^### 插件下载直链/{getline; while ($0=="") getline; print; exit}' | xargs)
           VERSION=$(echo "$body" | awk '/^### 插件版本号/{getline; while ($0=="") getline; print; exit}' | xargs)
+          SVG=$(echo "$body" | awk '/^### SVG 图标/{getline; while ($0=="") getline; print; exit}' | xargs)
+          echo "SVG=$SVG" >> $GITHUB_OUTPUT
           echo "NAME=$NAME" >> $GITHUB_OUTPUT
           echo "DESC=$DESC" >> $GITHUB_OUTPUT
           echo "AUTHOR=$AUTHOR" >> $GITHUB_OUTPUT
@@ -96,6 +98,9 @@ jobs:
             --arg issue "${{ github.event.issue.number }}" \
             '{filename:$fn, name:$name, author:$author, description:$desc, version:$version}')
           echo "$ENTRY" >> metadata/raw-plugin-index.jsonl
+          ICON_FILE="raw-plugin/${NAME}.svg"
+            echo "$SVG" > "$ICON_FILE"
+            git add "$ICON_FILE"
 
 
       - name: 生成唯一分支名
