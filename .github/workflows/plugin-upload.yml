@@ -37,16 +37,18 @@ jobs:
         continue-on-error: true
         run: |
           mkdir -p tmp
-          if curl --fail-with-body -fsSL '${{ steps.meta.outputs.URL }}' -o tmp/plugin.js; then
-            TS=$(date +%s)
-            RAND=$(openssl rand -hex 4)
-            FILENAME="${TS}-${{ github.event.issue.user.login }}-${RAND}.js"
-            mv tmp/plugin.js "raw-lyrics/$FILENAME"
-            echo "success=true"  >> $GITHUB_OUTPUT
-            echo "FILENAME=$FILENAME" >> $GITHUB_OUTPUT
-          else
+          status=$(curl -L -o tmp/plugin.js -w "%{http_code}" --fail-with-body "${{ steps.meta.outputs.URL }}")
+          echo "HTTP status : $status"
+          if [ $? -ne 0 ] || [ ! -s tmp/plugin.js ]; then
             echo "success=false" >> $GITHUB_OUTPUT
+            exit 0
           fi
+          TS=$(date +%s)
+          RAND=$(openssl rand -hex 4)
+          FILENAME="${TS}-${{ github.event.issue.user.login }}-${RAND}.js"
+          mv tmp/plugin.js "raw-lyrics/$FILENAME"
+          echo "success=true"  >> $GITHUB_OUTPUT
+          echo "FILENAME=$FILENAME" >> $GITHUB_OUTPUT
 
       - name: 下载失败处理
         if: steps.dl.outputs.success != 'true'
@@ -57,7 +59,7 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `@${{ github.event.issue.user.login }} 插件下载失败，请检查直链是否有效。`
+              body: `@${{ github.event.issue.user.login }} 插件下载失败，请检查直链是否有效（404 或无权限）。可编辑 Issue 修正链接后重新打开。`
             });
             await github.rest.issues.update({
               issue_number: context.issue.number,
@@ -105,7 +107,7 @@ jobs:
             来源 Issue：#${{ github.event.issue.number }}
           base: main
 
-      - name: 关闭 Issue
+      - name: 成功创建 PR 后关闭 Issue
         if: steps.dl.outputs.success == 'true'
         uses: actions/github-script@v7
         with:
@@ -122,3 +124,4 @@ jobs:
               repo: context.repo.repo,
               state: 'closed'
             });
+```
