@@ -92,13 +92,18 @@ jobs:
             '{filename:$fn, plugin:$name, author:$author, description:$desc, issue:$issue, mergedAt: now | todate}')
           echo "$ENTRY" >> metadata/raw-plugin-index.jsonl
 
+      - name: 生成唯一分支名
+        id: branch
+        run: |
+          TS=$(date +%s%3N)
+          echo "name=plugin/${{ steps.meta.outputs.NAME }}-${{ github.event.issue.number }}-$TS" >> $GITHUB_OUTPUT
+
       - name: 创建并推送分支
         if: steps.dl.outputs.success == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          TS=$(date +%s%3N)
-          BRANCH="plugin/${{ steps.meta.outputs.NAME }}-${{ github.event.issue.number }}-$TS"
+          BRANCH="${{ steps.branch.outputs.name }}"
           git branch -D "$BRANCH" || true
           git push origin --delete "$BRANCH" || true
           git checkout -b "$BRANCH"
@@ -112,12 +117,13 @@ jobs:
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          branch: "plugin/${{ steps.meta.outputs.NAME }}-${{ github.event.issue.number }}-$(date +%s%3N)"
+          branch: ${{ steps.branch.outputs.name }}
           title: "${{ steps.meta.outputs.NAME }}"
           body: |
             **插件名：** ${{ steps.meta.outputs.NAME }}  
             **作者：** @${{ steps.meta.outputs.AUTHOR }}  
             **简介：** ${{ steps.meta.outputs.DESC }}  
+
             来源 Issue：#${{ github.event.issue.number }}
           base: main
 
