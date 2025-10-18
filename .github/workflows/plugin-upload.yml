@@ -32,8 +32,7 @@ jobs:
           AUTHOR=$(echo "$body" | awk '/^### 插件作者/{getline; while ($0=="") getline; print; exit}' | xargs)
           URL=$(echo "$body"  | awk '/^### 插件下载直链/{getline; while ($0=="") getline; print; exit}' | xargs)
           VERSION=$(echo "$body" | awk '/^### 插件版本号/{getline; while ($0=="") getline; print; exit}' | xargs)
-
-          SVG=$(sed -n '/^### SVG 图标/,/^### \|^$/p' <<<"$body" | sed '1d;/^$/d;$d' | sed 's/^ *//')
+          SVG=$(sed -n '/^### SVG 图标/,/^###\|^$/p' <<<"$body" | sed '1d;$d' | sed '/^$/d')
 
           echo "SVG=$SVG" >> $GITHUB_OUTPUT
           echo "NAME=$NAME" >> $GITHUB_OUTPUT
@@ -42,14 +41,13 @@ jobs:
           echo "URL=$URL" >> $GITHUB_OUTPUT
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
 
-          # 调试用
           echo "==== Parsed ====="
           echo "NAME=[$NAME]"
           echo "DESC=[$DESC]"
           echo "AUTHOR=[$AUTHOR]"
           echo "URL=[$URL]"
           echo "VERSION=[$VERSION]"
-          echo "SVG 行数: $(echo "$SVG" | wc -l)"
+          echo "SVG 字节数: $(wc -c <<<"$SVG")"
 
 
       - name: 下载插件
@@ -108,7 +106,8 @@ jobs:
 
           # 写出 SVG（保留换行）
           ICON_FILE="raw-plugin/${{ steps.meta.outputs.NAME }}.svg"
-          echo "${{ steps.meta.outputs.SVG }}" > "$ICON_FILE"
+          cat > "$ICON_FILE" <<<"${{ steps.meta.outputs.SVG }}"
+          ls -l "$ICON_FILE"
           git add "$ICON_FILE"
 
 
