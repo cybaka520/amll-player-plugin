@@ -30,21 +30,22 @@ jobs:
           ${{ github.event.issue.body }}
           EOF
           )"
-          NAME=$(echo "$body" | sed -n '/^### 插件名/,/^$/p'         | grep -v '^#' | grep -v '^$' | head -1 | xargs)
-          DESC=$(echo "$body" | sed -n '/^### 插件简介/,/^$/p'       | grep -v '^#' | grep -v '^$' | head -1 | xargs)
-          AUTHOR=$(echo "$body" | sed -n '/^### 插件作者/,/^$/p'     | grep -v '^#' | grep -v '^$' | head -1 | xargs)
-          URL=$(echo "$body"  | sed -n '/^### 插件下载直链/,/^$/p'  | grep -v '^#' | grep -v '^$' | head -1 | xargs)
+          NAME=$(echo "$body" | sed -n 's/^[[:space:]]*-\{0,1\}[[:space:]]*//p' | sed -n '/插件名/,/^$/p'      | grep -v '^$' | head -1 | xargs)
+          DESC=$(echo "$body" | sed -n 's/^[[:space:]]*-\{0,1\}[[:space:]]*//p' | sed -n '/插件简介/,/^$/p'    | grep -v '^$' | head -1 | xargs)
+          AUTHOR=$(echo "$body" | sed -n 's/^[[:space:]]*-\{0,1\}[[:space:]]*//p' | sed -n '/插件作者/,/^$/p'  | grep -v '^$' | head -1 | xargs)
+          URL=$(echo "$body"  | sed -n 's/^[[:space:]]*-\{0,1\}[[:space:]]*//p' | sed -n '/插件下载直链/,/^$/p' | grep -v '^$' | head -1 | xargs)
 
           echo "NAME=$NAME" >> $GITHUB_OUTPUT
           echo "DESC=$DESC" >> $GITHUB_OUTPUT
           echo "AUTHOR=$AUTHOR" >> $GITHUB_OUTPUT
           echo "URL=$URL" >> $GITHUB_OUTPUT
-          
+
           echo "==== Parsed ====="
           echo "NAME=[$NAME]"
           echo "DESC=[$DESC]"
           echo "AUTHOR=[$AUTHOR]"
           echo "URL=[$URL]"
+
 
 
 
