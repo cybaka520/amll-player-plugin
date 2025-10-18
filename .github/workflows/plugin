@@ -1,0 +1,73 @@
+name: 发布插件
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]          # 或 master
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    if: github.event.pull_request.merged == true && startsWith(github.head_ref, 'plugin/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 获取关联 Issue 编号
+        id: issue
+        run: |
+          BODY='${{ github.event.pull_request.body }}'
+          ISSUE_NUM=$(echo "$BODY" | sed -n 's/.*来源 Issue：#\([0-9]\+\).*/\1/p')
+          echo "number=$ISSUE_NUM" >> $GITHUB_OUTPUT
+
+      - name: 读取 Issue 表单
+        id: meta
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: issue } = await github.rest.issues.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: ${{ steps.issue.outputs.number }}
+            });
+            const body = issue.body;
+            const get = (label) => {
+              const m = body.match(new RegExp(`^### ${label}\\r?\\n\\n(\\S+)\\r?\\n`, 'm'));
+              return m ? m[1].trim() : '';
+            };
+            core.setOutput('NAME',   get('插件名'));
+            core.setOutput('AUTHOR', get('插件作者'));
+            core.setOutput('VERSION',get('版本号'));
+            core.setOutput('FILENAME',issue.title.replace(/^Add plugin /,'')); // commit 里已含文件名
+            return;
+
+      - name: 生成目标目录
+        id: dir
+        run: |
+          DIR="amll-plugin/${{ steps.meta.outputs.NAME }}-${{ steps.meta.outputs.AUTHOR }}"
+          echo "path=$DIR" >> $GITHUB_OUTPUT
+          mkdir -p "$DIR"
+
+      - name: 复制插件到发布目录
+        run: |
+          SRC="raw-plugin/${{ steps.meta.outputs.FILENAME }}"
+          DST="${{ steps.dir.path }}/${{ steps.meta.outputs.NAME }}-${{ steps.meta.outputs.VERSION }}.js"
+          test -f "$SRC" || { echo "源文件 $SRC 不存在"; exit 1; }
+          cp "$SRC" "$DST"
+
+      - name: 删除旧版本
+        run: |
+          find "${{ steps.dir.path }}" -type f -name '*.js' ! -name '${{ steps.meta.outputs.NAME }}-${{ steps.meta.outputs.VERSION }}.js' -delete
+
+      - name: 提交并推送
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "${{ steps.dir.path }}"
+          git diff --cached --quiet && exit 0   # 无变化直接退出
+          git commit -m "Publish plugin ${{ steps.meta.outputs.NAME }} v${{ steps.meta.outputs.VERSION }} from #${{ steps.issue.outputs.number }}"
+          git push
