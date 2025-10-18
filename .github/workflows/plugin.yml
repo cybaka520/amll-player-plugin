@@ -23,21 +23,20 @@ jobs:
         with:
           script: |
             const body = context.payload.pull_request.body;
-            const get = l => {const m=body.match(new RegExp(`^\\\\*\\\\*${l}：\\\\*\\\\*\\\\s*(.+)\\\\s*$`,'m')); return m?m[1].trim():'';};
+            const get = l => {const m=body.match(new RegExp(`^\\\\*\\\\*${l}：\\\\*\\\\*\\\\s*(\\S+).*`,'m')); return m?m[1].trim():'';};
             const title = context.payload.pull_request.title;
             core.setOutput('NAME',    title.replace(/^Add plugin (.+) from #\d+$/,'$1'));
             core.setOutput('AUTHOR',  get('作者'));
             core.setOutput('VERSION', get('版本号'));
             core.setOutput('DESC',    get('简介'));
-            core.setOutput('FILENAME', get('文件名'));
+            core.setOutput('FILENAME',get('文件名'));
 
       - name: 复制插件前调试
-          run: |
+        run: |
           echo "FILENAME=[${{ steps.meta.outputs.FILENAME }}]"
           echo "NAME=[${{ steps.meta.outputs.NAME }}]"
           echo "AUTHOR=[${{ steps.meta.outputs.AUTHOR }}]"
-          ls -l raw-plugin
-            
+          ls -l raw-plugin/
 
       - name: 复制插件到发布目录
         run: |
@@ -46,7 +45,6 @@ jobs:
           mkdir -p amll-plugin
           test -f "$SRC" || { echo "源文件 $SRC 不存在"; exit 1; }
           cp "$SRC" "$DST"
-
 
       - name: 生成索引
         run: |
@@ -63,7 +61,7 @@ jobs:
       - name: 提交并推送
         run: |
           git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.email "github-actions[actions]@users.noreply.github.com"
           git add amll-plugin
           git diff --cached --quiet && exit 0
           git commit -m "Publish ${{ steps.meta.outputs.NAME }} v${{ steps.meta.outputs.VERSION }}"
