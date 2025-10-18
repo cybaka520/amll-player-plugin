@@ -32,7 +32,8 @@ jobs:
           AUTHOR=$(echo "$body" | awk '/^### 插件作者/{getline; while ($0=="") getline; print; exit}' | xargs)
           URL=$(echo "$body"  | awk '/^### 插件下载直链/{getline; while ($0=="") getline; print; exit}' | xargs)
           VERSION=$(echo "$body" | awk '/^### 插件版本号/{getline; while ($0=="") getline; print; exit}' | xargs)
-          SVG=$(sed -n '/^### SVG 图标/,/^###\|^$/p' <<<"$body" | sed '1d;$d' | sed '/^$/d')
+
+          SVG=$(sed -n '/^### SVG 图标/,/^###\|^$/p' <<<"$body" | sed '1d')
 
           echo "SVG=$SVG" >> $GITHUB_OUTPUT
           echo "NAME=$NAME" >> $GITHUB_OUTPUT
