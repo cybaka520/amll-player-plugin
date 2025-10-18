@@ -3,7 +3,7 @@ name: 发布插件
 on:
   pull_request:
     types: [closed]
-    branches: [main]          # 或 master
+    branches: [main]          
 
 permissions:
   contents: write
