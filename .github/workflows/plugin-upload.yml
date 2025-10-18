@@ -36,7 +36,7 @@ jobs:
           URL=$(echo "$body"  | sed -n '/^### 插件下载直链/,/^$/p'  | grep -v '^#' | grep -v '^$' | head -1 | xargs)
 
           echo "NAME=$NAME" >> $GITHUB_OUTPUT
-          echo "DESC=$DESC" >> $ITHUB_OUTPUT
+          echo "DESC=$DESC" >> $GITHUB_OUTPUT
           echo "AUTHOR=$AUTHOR" >> $GITHUB_OUTPUT
           echo "URL=$URL" >> $GITHUB_OUTPUT
           
