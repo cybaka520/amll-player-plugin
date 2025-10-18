@@ -131,26 +131,26 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
+            const issue_number = ${{ github.event.issue.number }};
+            const repo         = '${{ github.repository }}'.split('/');
+            const owner        = repo[0];
+            const repo_name    = repo[1];
+            const pr_url       = '${{ steps.cpr.outputs.pull-request-url }}';
+            const author       = '${{ github.event.issue.user.login }}';
+
             await github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: `已创建 PR：${{ steps.cpr.outputs.pull-request-url }} ，请等待审核。`
+              issue_number,
+              owner,
+              repo: repo_name,
+              body: `@${author} 已创建 PR：${pr_url} ，请等待审核。`
             });
+
             await github.rest.issues.update({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
+              issue_number,
+              owner,
+              repo: repo_name,
               state: 'closed'
             });
-            ENTRY=$(jq -n \
-            --arg fn "${{ steps.dl.outputs.FILENAME }}" \
-            --arg name "${{ steps.meta.outputs.NAME }}" \
-            --arg author "${{ steps.meta.outputs.AUTHOR }}" \
-            --arg desc "${{ steps.meta.outputs.DESC }}" \
-            --arg issue "${{ github.event.issue.number }}" \
-            '{filename:$fn, plugin:$name, author:$author, description:$desc, issue:$issue, mergedAt: now | todate}')
-            echo "$ENTRY" >> metadata/raw-plugin-index.jsonl
 
       - name: 创建并推送分支
         if: steps.dl.outputs.success == 'true'
