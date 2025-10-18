@@ -1,0 +1,36 @@
+name: "插件上传/更新"
+description: "提交新插件"
+title: "[插件上传/更新] "
+labels: ["插件上传/更新"]
+body:
+  - type: input
+    id: name
+    attributes:
+      label: 插件名
+      placeholder: 
+    validations:
+      required: true
+
+  - type: textarea
+    id: desc
+    attributes:
+      label: 插件简介
+      placeholder: 描述这个插件是干什么的
+    validations:
+      required: true
+
+  - type: input
+    id: author
+    attributes:
+      label: 插件作者
+      placeholder: GitHub 用户名
+    validations:
+      required: true
+
+  - type: input
+    id: url
+    attributes:
+      label: 插件下载直链
+      placeholder: 
+    validations:
+      required: true
