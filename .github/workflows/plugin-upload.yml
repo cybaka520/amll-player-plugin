@@ -26,15 +26,23 @@ jobs:
       - name: 解析issue
         id: meta
         run: |
-          jq -r '
-            "NAME=\(.name)",
-            "DESC=\(.desc)",
-            "AUTHOR=\(.author)",
-            "URL=\(.url)"
-          ' <<< '${{ github.event.issue.body }}' >> $GITHUB_OUTPUT
+          body='${{ github.event.issue.body }}'
+          NAME=$(echo "$body" | sed -n 's/^插件名:[[:space:]]*//p' | xargs)
+          DESC=$(echo "$body" | sed -n 's/^插件简介:[[:space:]]*//p' | xargs)
+          AUTHOR=$(echo "$body" | sed -n 's/^插件作者:[[:space:]]*//p' | xargs)
+          URL=$(echo "$body"  | sed -n 's/^插件下载直链:[[:space:]]*//p' | xargs)
+
+          echo "NAME=$NAME" >> $GITHUB_OUTPUT
+          echo "DESC=$DESC" >> $GITHUB_OUTPUT
+          echo "AUTHOR=$AUTHOR" >> $GITHUB_OUTPUT
+          echo "URL=$URL" >> $GITHUB_OUTPUT
 
           echo "==== Parsed ====="
-          tail -4 $GITHUB_OUTPUT
+          echo "NAME=[$NAME]"
+          echo "DESC=[$DESC]"
+          echo "AUTHOR=[$AUTHOR]"
+          echo "URL=[$URL]"
+
 
       - name: 下载插件
         id: dl
