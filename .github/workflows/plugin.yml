@@ -31,13 +31,13 @@ jobs:
             core.setOutput('DESC',    get('简介'));
             core.setOutput('FILENAME', get('文件名'));
 
-            - name: 复制插件前调试
+      - name: 复制插件前调试
           run: |
-           echo "FILENAME=[${{ steps.meta.outputs.FILENAME }}]"
-           echo "NAME=[${{ steps.meta.outputs.NAME }}]"
-           echo "AUTHOR=[${{ steps.meta.outputs.AUTHOR }}]"
-           ls -l raw-plugin/
-
+          echo "FILENAME=[${{ steps.meta.outputs.FILENAME }}]"
+          echo "NAME=[${{ steps.meta.outputs.NAME }}]"
+          echo "AUTHOR=[${{ steps.meta.outputs.AUTHOR }}]"
+          ls -l raw-plugin
+            
 
       - name: 复制插件到发布目录
         run: |
