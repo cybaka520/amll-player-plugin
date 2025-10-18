@@ -48,28 +48,28 @@ jobs:
           mkdir -p amll-plugin
           test -f "$SRC" || { echo "源文件 $SRC 不存在"; exit 1; }
           cp "$SRC" "$DST"
-
-      - name: 生成索引（仅首次写入）
+          
+      - name: 生成索引
         run: |
           INDEX="amll-plugin/index.jsonl"
           PLUGIN="${{ steps.meta.outputs.NAME }}"
           AUTHOR="${{ steps.meta.outputs.AUTHOR }}"
+          NEW=$(jq -n \
+                  --arg fn  "${{ steps.meta.outputs.NAME }}-${{ steps.meta.outputs.AUTHOR }}.js" \
+                  --arg name "$PLUGIN" \
+                  --arg desc "${{ steps.meta.outputs.DESC }}" \
+                  --arg author "$AUTHOR" \
+                  '{filename:$fn, plugin:$name, description:$desc, author:$author}')
 
-          EXISTS=$(jq -r --arg p "$PLUGIN" --arg a "$AUTHOR" '
-            any(.plugin == $p and .author == $a)
-          ' "$INDEX" 2>/dev/null || echo false)
+          # 删除旧记录
+          jq -c --arg p "$PLUGIN" --arg a "$AUTHOR" \
+            'select(.plugin != $p or .author != $a)' "$INDEX" 2>/dev/null > "$INDEX.tmp" || true
 
-          if [[ "$EXISTS" == "true" ]]; then
-            echo "已存在，仅更新文件"
-          else
-            jq -n \
-              --arg fn  "${{ steps.meta.outputs.NAME }}-${{ steps.meta.outputs.AUTHOR }}.js" \
-              --arg name "$PLUGIN" \
-              --arg desc "${{ steps.meta.outputs.DESC }}" \
-              --arg author "$AUTHOR" \
-              '{filename:$fn, plugin:$name, description:$desc, author:$author}' \
-            >> "$INDEX"
-          fi
+          # 追加新记录
+          echo "$NEW" >> "$INDEX.tmp"
+
+          # 原子替换
+          mv "$INDEX.tmp" "$INDEX"
 
 
 
