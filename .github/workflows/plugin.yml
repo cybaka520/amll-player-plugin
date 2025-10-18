@@ -49,12 +49,17 @@ jobs:
           test -f "$SRC" || { echo "源文件 $SRC 不存在"; exit 1; }
           cp "$SRC" "$DST"
 
-      - name: 生成索引
+      - name: 生成索引（仅首次写入）
         run: |
           INDEX="amll-plugin/index.jsonl"
           PLUGIN="${{ steps.meta.outputs.NAME }}"
           AUTHOR="${{ steps.meta.outputs.AUTHOR }}"
-          if grep -q "\"plugin\":\"$PLUGIN\",\"author\":\"$AUTHOR\"" "$INDEX"; then
+
+          EXISTS=$(jq -r --arg p "$PLUGIN" --arg a "$AUTHOR" '
+            any(.plugin == $p and .author == $a)
+          ' "$INDEX" 2>/dev/null || echo false)
+
+          if [[ "$EXISTS" == "true" ]]; then
             echo "已存在，仅更新文件"
           else
             jq -n \
@@ -65,6 +70,7 @@ jobs:
               '{filename:$fn, plugin:$name, description:$desc, author:$author}' \
             >> "$INDEX"
           fi
+
 
 
       - name: 提交并推送
