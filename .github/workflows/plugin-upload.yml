@@ -48,19 +48,23 @@ jobs:
         id: dl
         continue-on-error: true
         run: |
-          set -x          
+          set -x
           URL="${{ steps.meta.outputs.URL }}"
-          echo "Raw URL=[$URL]"  
-          mkdir -p tmp
-          status=$(curl -L -o tmp/plugin.js -w "%{http_code}" --fail-with-body "$URL")
-          if [ $? -ne 0 ] || [ ! -s tmp/plugin.js ]; then
+          echo "Raw URL=[$URL]"
+
+          mkdir -p raw-plugin
+          curl -L -o raw-plugin/plugin.js -w "%{http_code}" --fail-with-body "$URL"
+          status=$?
+          if [ $status -ne 0 ] || [ ! -s raw-plugin/plugin.js ]; then
             echo "success=false" >> $GITHUB_OUTPUT
             exit 0
           fi
+
           TS=$(date +%s)
           RAND=$(openssl rand -hex 4)
           FILENAME="${TS}-${{ github.event.issue.user.login }}-${RAND}.js"
-          mv tmp/plugin.js "raw-lyrics/$FILENAME"
+          mv raw-plugin/plugin.js raw-plugin/"$FILENAME"
+
           echo "success=true"  >> $GITHUB_OUTPUT
           echo "FILENAME=$FILENAME" >> $GITHUB_OUTPUT
 
@@ -102,7 +106,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -b "plugin/${{ steps.meta.outputs.NAME }}-${{ github.run_id }}"
-          git add raw-lyrics/${{ steps.dl.outputs.FILENAME }} metadata/raw-plugin-index.jsonl
+          git add raw-plugin/${{ steps.dl.outputs.FILENAME }} metadata/raw-plugin-index.jsonl
           git commit -m "Add plugin ${{ steps.meta.outputs.NAME }} from #${{ github.event.issue.number }}"
           git push origin "plugin/${{ steps.meta.outputs.NAME }}-${{ github.run_id }}"
 
