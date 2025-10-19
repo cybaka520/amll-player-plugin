@@ -27,15 +27,21 @@ jobs:
         id: meta
         run: |
           body='${{ github.event.issue.body }}'
-          NAME=$(echo "$body" | awk '/^### 插件名/{getline; while ($0=="") getline; print; exit}' | xargs)
-          DESC=$(echo "$body" | awk '/^### 插件简介/{getline; while ($0=="") getline; print; exit}' | xargs)
-          AUTHOR=$(echo "$body" | awk '/^### 插件作者/{getline; while ($0=="") getline; print; exit}' | xargs)
-          URL=$(echo "$body"  | awk '/^### 插件下载直链/{getline; while ($0=="") getline; print; exit}' | xargs)
-          VERSION=$(echo "$body" | awk '/^### 插件版本号/{getline; while ($0=="") getline; print; exit}' | xargs)
+          NAME=$(sed -n '/^### 插件名/,/^###\|^$/p'     <<<"$body" | sed '1d')
+          DESC=$(sed -n '/^### 插件简介/,/^###\|^$/p'   <<<"$body" | sed '1d')
+          AUTHOR=$(sed -n '/^### 插件作者/,/^###\|^$/p' <<<"$body" | sed '1d')
+          URL=$(sed -n '/^### 插件下载直链/,/^###\|^$/p' <<<"$body" | sed '1d')
+          VERSION=$(sed -n '/^### 插件版本号/,/^###\|^$/p' <<<"$body" | sed '1d')
+          SVG=$(sed -n '/^### SVG 图标/,/^###\|^$/p'   <<<"$body" | sed '1d')
+          
+          trim() { sed -e 's/^ *//' -e 's/ *$//' -e '/^$/d' | tr -d '\n'; }
+          NAME=$(trim <<<"$NAME")
+          DESC=$(trim <<<"$DESC")
+          AUTHOR=$(trim <<<"$AUTHOR")
+          URL=$(trim <<<"$URL")
+          VERSION=$(trim <<<"$VERSION")
 
-          # 取整块 SVG（含换行），只删标题行
-          SVG=$(sed -n '/^### SVG 图标/,/^###\|^$/p' <<<"$body" | sed '1d')
-
+ 
           echo "SVG=$SVG" >> $GITHUB_OUTPUT
           echo "NAME=$NAME" >> $GITHUB_OUTPUT
           echo "DESC=$DESC" >> $GITHUB_OUTPUT
