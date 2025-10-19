@@ -17,24 +17,230 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: 安装 jq
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y jq
+
       - name: 读取 PR 信息
         id: meta
         uses: actions/github-script@v7
         with:
           script: |
-            const body = context.payload.pull_request.body;
-            const get = l => {const m=body.match(new RegExp(`\\*\\*${l}：\\*\\*\\s*(.+?)\\s*(?:\\*\\*|$)`,'s')); return m?m[1].trim():'';};
-            const title = context.payload.pull_request.title;
-            core.setOutput('NAME',    title.replace(/^Add plugin (.+) from #\d+$/,'$1'));
-            let author = get('作者');
-            author = author.replace(/^@/,'');
-            core.setOutput('AUTHOR',  author);
-            core.setOutput('VERSION', get('版本号'));
-            core.setOutput('DESC',    get('简介'));
-            core.setOutput('FILENAME',get('文件名'));
+            const body = context.payload.pull_request.body || '';
+            const title = context.payload.pull_request.title || '';
+            
+            // 提取函数
+            const get = (label) => {
+              const regex = new RegExp(`\\*\\*${label}[：:]\\*\\*\\s*(.+?)(?:\\s*\\*\\*|\\n|$)`, 's');
+              const match = body.match(regex);
+              return match ? match[1].trim() : '';
+            };
+            
+            // 提取各字段
+            let name = get('插件名');
+            let author = get('作者').replace(/^@/, '');
+            const version = get('版本号');
+            const desc = get('简介');
+            const filename = get('文件名');
+            
+            // 如果插件名为空，尝试从标题提取
+            if (!name) {
+              // 处理 "插件上传: XXX" 格式
+              const titleMatch = title.match(/插件上传[：:]\s*(.+)$/);
+              if (titleMatch) {
+                name = titleMatch[1].trim();
+              } else {
+                // 处理 "Add plugin XXX from #123" 格式
+                const addMatch = title.match(/^Add plugin\s+(.+?)\s+from\s+#\d+$/);
+                if (addMatch) {
+                  name = addMatch[1].trim();
+                }
+              }
+            }
+            
+            // 生成安全的文件名（移除特殊字符）
+            const safeName = name.replace(/[^a-zA-Z0-9_\u4e00-\u9fa5-]/g, '_').toLowerCase();
+            
+            console.log('解析结果:');
+            console.log('NAME:', name);
+            console.log('SAFE_NAME:', safeName);
+            console.log('AUTHOR:', author);
+            console.log('VERSION:', version);
+            console.log('DESC:', desc);
+            console.log('FILENAME:', filename);
+            
+            core.setOutput('NAME', name);
+            core.setOutput('SAFE_NAME', safeName);
+            core.setOutput('AUTHOR', author);
+            core.setOutput('VERSION', version);
+            core.setOutput('DESC', desc);
+            core.setOutput('FILENAME', filename);
 
+      - name: 验证必填字段
+        run: |
+          NAME="${{ steps.meta.outputs.NAME }}"
+          AUTHOR="${{ steps.meta.outputs.AUTHOR }}"
+          FILENAME="${{ steps.meta.outputs.FILENAME }}"
+          
+          if [ -z "$NAME" ] || [ -z "$FILENAME" ]; then
+            echo "错误: 缺少必填字段"
+            echo "NAME=[$NAME]"
+            echo "AUTHOR=[$AUTHOR]"
+            echo "FILENAME=[$FILENAME]"
+            exit 1
+          fi
 
-      - name: 复制插件前调试
+      - name: 调试信息
+        run: |
+          echo "==== 提取的元数据 ===="
+          echo "NAME=[${{ steps.meta.outputs.NAME }}]"
+          echo "SAFE_NAME=[${{ steps.meta.outputs.SAFE_NAME }}]"
+          echo "AUTHOR=[${{ steps.meta.outputs.AUTHOR }}]"
+          echo "VERSION=[${{ steps.meta.outputs.VERSION }}]"
+          echo "FILENAME=[${{ steps.meta.outputs.FILENAME }}]"
+          echo ""
+          echo "==== raw-plugin 目录内容 ===="
+          ls -lh raw-plugin/ || echo "raw-plugin 目录不存在"
+          echo ""
+          echo "==== 查找可能的 SVG 文件 ===="
+          find raw-plugin -name "*.svg" -type f 2>/dev/null || echo "未找到 SVG 文件"
+
+      - name: 复制插件到发布目录
+        run: |
+          SRC="raw-plugin/${{ steps.meta.outputs.FILENAME }}"
+          
+          # 生成目标文件名
+          if [ -n "${{ steps.meta.outputs.AUTHOR }}" ]; then
+            DST="amll-plugin/${{ steps.meta.outputs.SAFE_NAME }}-${{ steps.meta.outputs.AUTHOR }}.js"
+          else
+            DST="amll-plugin/${{ steps.meta.outputs.SAFE_NAME }}.js"
+          fi
+          
+          mkdir -p amll-plugin
+          
+          # 检查源文件
+          if [ ! -f "$SRC" ]; then
+            echo "错误: 源文件不存在: $SRC"
+            echo "raw-plugin 目录内容:"
+            ls -la raw-plugin/
+            exit 1
+          fi
+          
+          # 复制插件文件
+          cp "$SRC" "$DST"
+          echo "已复制插件: $SRC -> $DST"
+          
+          # 查找并复制图标（使用 SAFE_NAME）
+          # 尝试多种可能的文件名
+          ICON_DST="${DST%.js}.svg"
+          FOUND_ICON=false
+          
+          for ICON_SRC in \
+            "raw-plugin/${{ steps.meta.outputs.SAFE_NAME }}.svg" \
+            "raw-plugin/${{ steps.meta.outputs.NAME }}.svg"; do
+            if [ -f "$ICON_SRC" ]; then
+              cp "$ICON_SRC" "$ICON_DST"
+              echo "已复制图标: $ICON_SRC -> $ICON_DST"
+              FOUND_ICON=true
+              break
+            fi
+          done
+          
+          if [ "$FOUND_ICON" = false ]; then
+            echo "警告: 未找到图标文件，已跳过"
+          fi
+          
+      - name: 生成索引
+        run: |
+          INDEX="amll-plugin/index.jsonl"
+          PLUGIN="${{ steps.meta.outputs.NAME }}"
+          AUTHOR="${{ steps.meta.outputs.AUTHOR }}"
+          SAFE_NAME="${{ steps.meta.outputs.SAFE_NAME }}"
+          
+          # 生成文件名
+          if [ -n "$AUTHOR" ]; then
+            FILENAME="${SAFE_NAME}-${AUTHOR}.js"
+            ICON_NAME="${SAFE_NAME}-${AUTHOR}.svg"
+          else
+            FILENAME="${SAFE_NAME}.js"
+            ICON_NAME="${SAFE_NAME}.svg"
+          fi
+          
+          # 检查图标是否存在
+          if [ -f "amll-plugin/$ICON_NAME" ]; then
+            HAS_ICON=true
+          else
+            HAS_ICON=false
+            ICON_NAME=""
+          fi
+          
+          # 创建新记录
+          if [ "$HAS_ICON" = true ]; then
+            NEW=$(jq -n \
+              --arg fn "$FILENAME" \
+              --arg icon "$ICON_NAME" \
+              --arg name "$PLUGIN" \
+              --arg desc "${{ steps.meta.outputs.DESC }}" \
+              --arg author "$AUTHOR" \
+              --arg version "${{ steps.meta.outputs.VERSION }}" \
+              '{filename:$fn, icon:$icon, plugin:$name, description:$desc, author:$author, version:$version}')
+          else
+            NEW=$(jq -n \
+              --arg fn "$FILENAME" \
+              --arg name "$PLUGIN" \
+              --arg desc "${{ steps.meta.outputs.DESC }}" \
+              --arg author "$AUTHOR" \
+              --arg version "${{ steps.meta.outputs.VERSION }}" \
+              '{filename:$fn, plugin:$name, description:$desc, author:$author, version:$version}')
+          fi
+
+          # 创建索引文件（如果不存在）
+          touch "$INDEX"
+
+          # 删除同名插件的旧记录（根据插件名和作者）
+          if [ -s "$INDEX" ]; then
+            jq -c --arg p "$PLUGIN" --arg a "$AUTHOR" \
+              'select(.plugin != $p or .author != $a)' "$INDEX" > "$INDEX.tmp" || true
+          else
+            touch "$INDEX.tmp"
+          fi
+
+          # 追加新记录
+          echo "$NEW" >> "$INDEX.tmp"
+
+          # 原子替换
+          mv "$INDEX.tmp" "$INDEX"
+          
+          echo "索引已更新:"
+          cat "$INDEX"
+
+      - name: 提交并推送
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add amll-plugin
+          
+          # 检查是否有变更
+          if git diff --cached --quiet; then
+            echo "没有变更需要提交"
+            exit 0
+          fi
+          
+          git commit -m "Publish ${{ steps.meta.outputs.NAME }} v${{ steps.meta.outputs.VERSION }}"
+          git push
+
+      - name: 评论 PR
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              issue_number: context.payload.pull_request.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `🎉 插件 **${{ steps.meta.outputs.NAME }}** v${{ steps.meta.outputs.VERSION }} 已成功发布！`
+            });      - name: 复制插件前调试
         run: |
           echo "FILENAME=[${{ steps.meta.outputs.FILENAME }}]"
           echo "NAME=[${{ steps.meta.outputs.NAME }}]"
