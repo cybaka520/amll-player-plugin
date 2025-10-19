@@ -92,6 +92,230 @@ jobs:
         with:
           script: |
             const error = '${{ steps.meta.outputs.error }}' || '解析 Issue 失败';
+            const username = '${{ github.event.issue.user.login }}';
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `@${username} ${error}，请检查 Issue 格式是否正确。`
+            });
+            await github.rest.issues.addLabels({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: ['需要修改']
+            });
+            core.setFailed(error);
+
+      - name: 下载插件
+        if: steps.meta.outputs.success == 'true'
+        id: dl
+        continue-on-error: true
+        run: |
+          set -e
+          URL="${{ steps.meta.outputs.URL }}"
+          mkdir -p raw-plugin
+          
+          # 下载并检查 HTTP 状态码
+          HTTP_CODE=$(curl -L -o raw-plugin/plugin.js -w "%{http_code}" -s --fail-with-body "$URL" || echo "000")
+          
+          if [ "$HTTP_CODE" != "200" ] || [ ! -s raw-plugin/plugin.js ]; then
+            echo "success=false" >> $GITHUB_OUTPUT
+            echo "error=下载失败，HTTP 状态码: $HTTP_CODE" >> $GITHUB_OUTPUT
+            echo "下载失败，HTTP 状态码: $HTTP_CODE"
+            exit 0
+          fi
+          
+          # 检查文件是否为有效的 JavaScript
+          if ! head -n 1 raw-plugin/plugin.js | grep -qE '^[[:space:]]*(\/\/|\/\*|function|class|const|let|var|\(|{)'; then
+            echo "success=false" >> $GITHUB_OUTPUT
+            echo "error=下载的文件不是有效的 JavaScript 文件" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # 生成唯一文件名
+          TS=$(date +%s)
+          RAND=$(openssl rand -hex 4)
+          FILENAME="${TS}-${{ github.event.issue.user.login }}-${RAND}.js"
+          mv raw-plugin/plugin.js raw-plugin/"$FILENAME"
+          
+          echo "success=true" >> $GITHUB_OUTPUT
+          echo "FILENAME=$FILENAME" >> $GITHUB_OUTPUT
+          echo "插件下载成功: $FILENAME ($(stat -f%z raw-plugin/"$FILENAME" 2>/dev/null || stat -c%s raw-plugin/"$FILENAME") bytes)"
+
+      - name: 下载失败处理
+        if: steps.meta.outputs.success == 'true' && steps.dl.outputs.success != 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const error = '${{ steps.dl.outputs.error }}' || '插件下载失败';
+            const username = '${{ github.event.issue.user.login }}';
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `@${username} ${error}，请检查直链是否有效。`
+            });
+            await github.rest.issues.addLabels({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: ['需要修改']
+            });
+            core.setFailed(error);
+
+      - name: 添加元数据 & 写入 SVG
+        if: steps.dl.outputs.success == 'true'
+        run: |
+          # 确保目录存在
+          mkdir -p metadata raw-plugin
+
+          # 创建元数据条目
+          ENTRY=$(jq -n \
+            --arg fn "${{ steps.dl.outputs.FILENAME }}" \
+            --arg name "${{ steps.meta.outputs.NAME }}" \
+            --arg author "${{ steps.meta.outputs.AUTHOR }}" \
+            --arg desc "${{ steps.meta.outputs.DESC }}" \
+            --arg version "${{ steps.meta.outputs.VERSION }}" \
+            --arg issue "${{ github.event.issue.number }}" \
+            '{filename:$fn, name:$name, author:$author, description:$desc, version:$version, issue:$issue}')
+          
+          echo "$ENTRY" >> metadata/raw-plugin-index.jsonl
+
+          # 写入 SVG 文件（如果存在）
+          ICON_FILE="raw-plugin/${{ steps.meta.outputs.SAFE_NAME }}.svg"
+          if [ -s "${{ steps.meta.outputs.SVG_FILE }}" ]; then
+            cp "${{ steps.meta.outputs.SVG_FILE }}" "$ICON_FILE"
+            echo "SVG 文件已创建: $ICON_FILE"
+            ls -lh "$ICON_FILE"
+            echo "SVG 内容预览:"
+            head -n 5 "$ICON_FILE"
+          else
+            echo "未提供 SVG 图标，跳过"
+          fi
+          
+          # 添加到 git
+          git add raw-plugin/${{ steps.dl.outputs.FILENAME }} metadata/raw-plugin-index.jsonl
+          if [ -f "$ICON_FILE" ]; then
+            git add "$ICON_FILE"
+          fi
+
+      - name: 生成唯一分支名
+        if: steps.dl.outputs.success == 'true'
+        id: branch
+        run: |
+          TS=$(date +%s%3N)
+          BRANCH="plugin/${{ steps.meta.outputs.SAFE_NAME }}-${{ github.event.issue.number }}-$TS"
+          echo "name=$BRANCH" >> $GITHUB_OUTPUT
+          echo "分支名: $BRANCH"
+
+      - name: 创建 PR
+        if: steps.dl.outputs.success == 'true'
+        id: cpr
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ steps.branch.outputs.name }}
+          title: "Add plugin ${{ steps.meta.outputs.NAME }} from #${{ github.event.issue.number }}"
+          body: |
+            **插件名：** ${{ steps.meta.outputs.NAME }}  
+            **作者：** @${{ github.event.issue.user.login }}  
+            **版本号：** ${{ steps.meta.outputs.VERSION }}  
+            **简介：** ${{ steps.meta.outputs.DESC }}  
+            **文件名：** ${{ steps.dl.outputs.FILENAME }}  
+            **来源 Issue：** #${{ github.event.issue.number }}
+          base: main
+          commit-message: "Add plugin ${{ steps.meta.outputs.NAME }} from #${{ github.event.issue.number }}"
+          delete-branch: true
+
+      - name: PR 创建失败处理
+        if: steps.dl.outputs.success == 'true' && steps.cpr.outputs.pull-request-number == ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const username = '${{ github.event.issue.user.login }}';
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `@${username} PR 创建失败。`
+            });
+            await github.rest.issues.addLabels({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: ['需要人工处理']
+            });
+            core.setFailed('PR 创建失败');
+
+      - name: 成功创建 PR 后关闭 Issue
+        if: steps.dl.outputs.success == 'true' && steps.cpr.outputs.pull-request-number != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue_number = context.issue.number;
+            const author = '${{ github.event.issue.user.login }}';
+            const pr_url = '${{ steps.cpr.outputs.pull-request-url }}';
+            const pr_number = '${{ steps.cpr.outputs.pull-request-number }}';
+            
+            EOL
+
+             # 提取基本信息
+            NAME=$(awk '/^### 插件名/{getline; while ($0=="") getline; print; exit}' /tmp/issue_body.txt | xargs)
+            DESC=$(awk '/^### 插件简介/{getline; while ($0=="") getline; print; exit}' /tmp/issue_body.txt | xargs)
+            AUTHOR=$(awk '/^### 插件作者/{getline; while ($0=="") getline; print; exit}' /tmp/issue_body.txt | xargs)
+            URL=$(awk '/^### 插件下载直链/{getline; while ($0=="") getline; print; exit}' /tmp/issue_body.txt | xargs)
+            VERSION=$(awk '/^### 插件版本号/{getline; while ($0=="") getline; print; exit}' /tmp/issue_body.txt | xargs)
+
+            # 验证必填字段
+            if [ -z "$NAME" ] || [ -z "$URL" ] || [ -z "$VERSION" ]; then
+            echo "error=缺少必填字段（插件名/下载直链/版本号）" >> $GITHUB_OUTPUT
+            echo "success=false" >> $GITHUB_OUTPUT
+            exit 0
+            fi
+
+            # 提取 SVG 内容（从 "### SVG 图标" 之后到下一个 "###" 或文件末尾）
+            awk '/^### SVG 图标/{flag=1; next} /^###/{flag=0} flag' /tmp/issue_body.txt > /tmp/svg_content.txt
+          
+            # 移除开头和结尾的空行
+            sed -i '/./,$!d' /tmp/svg_content.txt
+            # 修复的 sed 命令
+            sed -i ':a' -e '/^\s*$/d;N;ba' /tmp/svg_content.txt 2>/dev/null || true
+
+            # 生成安全的文件名（移除特殊字符）
+            SAFE_NAME=$(echo "$NAME" | tr -cd '[:alnum:]_-' | tr '[:upper:]' '[:lower:]')
+            if [ -z "$SAFE_NAME" ]; then
+             SAFE_NAME="plugin-$(date +%s)"
+            fi
+
+            # 保存 SVG 内容路径
+            echo "SVG_FILE=/tmp/svg_content.txt" >> $GITHUB_OUTPUT
+            echo "SAFE_NAME=$SAFE_NAME" >> $GITHUB_OUTPUT
+            echo "NAME=$NAME" >> $GITHUB_OUTPUT
+            echo "DESC=$DESC" >> $GITHUB_OUTPUT
+            echo "AUTHOR=$AUTHOR" >> $GITHUB_OUTPUT
+            echo "URL=$URL" >> $GITHUB_OUTPUT
+            echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+            echo "success=true" >> $GITHUB_OUTPUT
+
+            echo "==== Parsed ====="
+            echo "NAME=[$NAME]"
+            echo "SAFE_NAME=[$SAFE_NAME]"
+            echo "DESC=[$DESC]"
+            echo "AUTHOR=[$AUTHOR]"
+            echo "URL=[$URL]"
+            echo "VERSION=[$VERSION]"
+            echo "SVG 内容:"
+            cat /tmp/svg_content.txt || echo "(无 SVG 内容)"
+            echo ""
+            echo "SVG 字节数: $(wc -c < /tmp/svg_content.txt)"
+
+      - name: 解析失败处理
+        if: steps.meta.outputs.success != 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const error = '${{ steps.meta.outputs.error }}' || '解析 Issue 失败';
             await github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
@@ -108,7 +332,7 @@ jobs:
 
       - name: 下载插件
         if: steps.meta.outputs.success == 'true'
-        id: dl
+        id: dll
         continue-on-error: true
         run: |
           set -e
@@ -193,7 +417,7 @@ jobs:
 
       - name: 生成唯一分支名
         if: steps.dl.outputs.success == 'true'
-        id: branch
+        id: branchc
         run: |
           TS=$(date +%s%3N)
           BRANCH="plugin/${{ steps.meta.outputs.SAFE_NAME }}-${{ github.event.issue.number }}-$TS"
@@ -202,7 +426,7 @@ jobs:
 
       - name: 创建 PR
         if: steps.dl.outputs.success == 'true'
-        id: cpr
+        id: cprj
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
