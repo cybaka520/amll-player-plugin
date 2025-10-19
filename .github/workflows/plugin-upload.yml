@@ -207,7 +207,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           branch: ${{ steps.branch.outputs.name }}
-          title: "插件上传: ${{ steps.meta.outputs.NAME }}"
+          title: "Add plugin ${{ steps.meta.outputs.NAME }} from #${{ github.event.issue.number }}"
           body: |
             **插件名：** ${{ steps.meta.outputs.NAME }}  
             **作者：** @${{ github.event.issue.user.login }}  
@@ -250,15 +250,4 @@ jobs:
             
             await github.rest.issues.createComment({
               issue_number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: `@${author} 已创建 PR #${pr_number}：${pr_url}\n\n请等待审核。🎉`
-            });
-            
-            await github.rest.issues.update({
-              issue_number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'closed',
-              state_reason: 'completed'
-            });
+              owner: con
